@@ -54,72 +54,80 @@ export async function searchSongs(term: string): Promise<Omit<Song, 'rank'>[]> {
       }]
     }
 
-    // 3. iTunes Search: Try standard Fetch first, then fallback to JSONP
-    const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=20`
+    // 3. iTunes Search: Use JSONP directly for maximum compatibility across browsers/mobile
+    // We avoid standard fetch for iTunes because it often fails CORS on client-side,
+    // and the fallback delay was causing issues on mobile devices.
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout for fetch
+    // Robust trim for mobile keyboards (handles non-breaking spaces)
+    const cleanQuery = query.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '').trim()
 
-      const response = await fetch(itunesUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
+    // Using country=AR as there's strong evidence of the user being in Argentina.
+    // Explicit country often helps when mobile networks route traffic through different gateways.
+    // Also added a cache buster and removed redundant media=music.
+    const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanQuery)}&entity=song&limit=50&country=AR&at=${Date.now()}`
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.results && data.results.length > 0) {
-          return data.results.map((item: any): Omit<Song, 'rank'> => ({
-            title: item.trackName || item.collectionName || 'Unknown Title',
-            artist: item.artistName || 'Unknown Artist',
-            album: item.collectionName || 'Unknown Album',
-            year: item.releaseDate ? new Date(item.releaseDate).getFullYear() : new Date().getFullYear(),
-            cover: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '300x300bb') : '',
-          }));
-        }
-      }
-    } catch (e) {
-      console.warn('iTunes Fetch failed, trying JSONP...', e);
-    }
-
-    // 4. JSONP Fallback (for Safari/Mobile CORS issues)
     return new Promise((resolve) => {
-      const callbackName = 'itunesCallback_' + Date.now();
-      const script = document.createElement('script');
+      const callbackName = `itunes_cb_${Math.floor(Math.random() * 1000000)}`
+      const script = document.createElement('script')
+
+      let isResolved = false
 
       const cleanup = () => {
-        if ((window as any)[callbackName]) delete (window as any)[callbackName];
-        if (script.parentNode) script.parentNode.removeChild(script);
-        clearTimeout(timeout);
-      };
+        if ((window as any)[callbackName]) {
+          try {
+            delete (window as any)[callbackName]
+          } catch (e) {
+            (window as any)[callbackName] = undefined
+          }
+        }
+        if (script.parentNode) script.parentNode.removeChild(script)
+      }
 
       const timeout = setTimeout(() => {
-        cleanup();
-        resolve([]);
-      }, 6000);
+        if (!isResolved) {
+          isResolved = true
+          cleanup()
+          console.warn('iTunes Search timed out for:', cleanQuery)
+          resolve([])
+        }
+      }, 10000) // 10s timeout for flaky mobile connections
 
-      (window as any)[callbackName] = (data: any) => {
-        cleanup();
-        if (!data || !data.results) {
-          resolve([]);
-          return;
+        ; (window as any)[callbackName] = (data: any) => {
+          if (isResolved) return
+          isResolved = true
+          clearTimeout(timeout)
+          cleanup()
+
+          if (!data || !data.results || data.results.length === 0) {
+            console.log('No iTunes results found for:', cleanQuery)
+            resolve([])
+            return
+          }
+
+          const results = data.results.map((item: any): Omit<Song, 'rank'> => ({
+            title: item.trackName || item.collectionName || 'Canción Desconocida',
+            artist: item.artistName || 'Artista Desconocido',
+            album: item.collectionName || 'Álbum Desconocido',
+            year: item.releaseDate ? new Date(item.releaseDate).getFullYear() : new Date().getFullYear(),
+            cover: item.artworkUrl100
+              ? item.artworkUrl100.replace('100x100bb', '400x400bb')
+              : 'https://placehold.co/400x400/216bb9/white?text=Top100',
+          }))
+          resolve(results)
         }
 
-        const results = data.results.map((item: any): Omit<Song, 'rank'> => ({
-          title: item.trackName || item.collectionName || 'Unknown Title',
-          artist: item.artistName || 'Unknown Artist',
-          album: item.collectionName || 'Unknown Album',
-          year: item.releaseDate ? new Date(item.releaseDate).getFullYear() : new Date().getFullYear(),
-          cover: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '300x300bb') : '',
-        }));
-        resolve(results);
-      };
+      script.src = `${itunesUrl}&callback=${callbackName}`
+      script.onerror = (e) => {
+        if (isResolved) return
+        isResolved = true
+        clearTimeout(timeout)
+        cleanup()
+        console.error('iTunes JSONP script error:', e)
+        resolve([])
+      }
 
-      script.src = `${itunesUrl}&callback=${callbackName}&_cb=${Math.random().toString(36).substring(7)}`;
-      script.onerror = () => {
-        cleanup();
-        resolve([]);
-      };
-      document.body.appendChild(script);
-    });
+      document.body.appendChild(script)
+    })
   } catch (error) {
     console.error('Search general error:', error)
     return []
