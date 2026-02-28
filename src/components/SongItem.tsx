@@ -6,9 +6,10 @@ import { useState } from 'react'
 
 interface SongItemProps {
   song: Song
+  onDoubleClick?: (rank: number) => void
 }
 
-export function SongItem({ song }: SongItemProps) {
+export function SongItem({ song, onDoubleClick }: SongItemProps) {
   const [imgError, setImgError] = useState(false)
   const {
     attributes,
@@ -28,7 +29,8 @@ export function SongItem({ song }: SongItemProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative sketch-panel p-2 mb-3 flex items-center gap-3 group ${isDragging ? 'opacity-80 z-50 scale-[1.01] shadow-[8px_8px_0_var(--color-ink)]' : 'hover:bg-brand-bg/30'
+      onDoubleClick={() => onDoubleClick?.(song.rank)}
+      className={`relative sketch-panel p-2 mb-3 flex items-center gap-3 group select-none ${isDragging ? 'opacity-80 z-50 scale-[1.01] shadow-[8px_8px_0_var(--color-ink)]' : 'hover:bg-brand-bg/30'
         }`}
     >
       <div className="flex-shrink-0 w-8 text-center font-serif text-[1.1rem] text-ink">

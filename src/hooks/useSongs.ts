@@ -70,6 +70,17 @@ export function useSongs() {
     })
   }, [])
 
+  const deleteSong = useCallback((rank: number) => {
+    setSongs((current) => {
+      const filtered = current.filter((s) => s.rank !== rank)
+      // Re-rank remaining songs
+      return filtered.map((song, idx) => ({
+        ...song,
+        rank: idx + 1,
+      }))
+    })
+  }, [])
+
   const exportToJson = useCallback(() => {
     const dataStr = JSON.stringify(songs, null, 2)
     const blob = new Blob([dataStr], { type: 'application/json' })
@@ -84,5 +95,5 @@ export function useSongs() {
     URL.revokeObjectURL(url)
   }, [songs])
 
-  return { songs, loading, reorderSongs, addSong, exportToJson }
+  return { songs, loading, reorderSongs, addSong, deleteSong, exportToJson }
 }

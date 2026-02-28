@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { useSongs } from './hooks/useSongs'
 import { SongList } from './components/SongList'
 import { AdminDashboard } from './components/AdminDashboard'
+import { DeleteAuthModal } from './components/DeleteAuthModal'
 import { CheckCircle2, Plus, X } from 'lucide-react'
 
 function App() {
-  const { songs, loading, reorderSongs, addSong } = useSongs()
+  const { songs, loading, reorderSongs, addSong, deleteSong } = useSongs()
   const [isAdminOpen, setIsAdminOpen] = useState(false)
+  const [songToDelete, setSongToDelete] = useState<any | null>(null)
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false })
 
   const handleAddSong = (song: Omit<any, 'rank'>) => {
@@ -64,7 +66,11 @@ function App() {
             Brewing songs...
           </div>
         ) : (
-          <SongList songs={songs} onReorder={reorderSongs} />
+          <SongList
+            songs={songs}
+            onReorder={reorderSongs}
+            onDoubleClickSong={(rank) => setSongToDelete(songs.find(s => s.rank === rank) || null)}
+          />
         )}
 
         <div
@@ -88,6 +94,19 @@ function App() {
         >
           {isAdminOpen ? <X size={28} strokeWidth={3} /> : <Plus size={28} strokeWidth={3} />}
         </button>
+
+        <DeleteAuthModal
+          isOpen={!!songToDelete}
+          songTitle={songToDelete?.title || ''}
+          onClose={() => setSongToDelete(null)}
+          onConfirm={() => {
+            if (songToDelete) {
+              deleteSong(songToDelete.rank)
+              setToast({ message: `Borraste "${songToDelete.title}"`, visible: true })
+              setTimeout(() => setToast(t => ({ ...t, visible: false })), 3000)
+            }
+          }}
+        />
       </main>
     </div>
   )

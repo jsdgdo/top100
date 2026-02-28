@@ -18,9 +18,10 @@ import { SongItem } from './SongItem'
 interface SongListProps {
   songs: Song[]
   onReorder: (activeId: string, overId: string) => void
+  onDoubleClickSong?: (rank: number) => void
 }
 
-export function SongList({ songs, onReorder }: SongListProps) {
+export function SongList({ songs, onReorder, onDoubleClickSong }: SongListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -45,7 +46,7 @@ export function SongList({ songs, onReorder }: SongListProps) {
   if (songs.length === 0) {
     return (
       <div className="text-center p-12 sketch-panel">
-        <p className="font-hand text-3xl text-ink">No songs brewed yet.</p>
+        <p className="font-hand text-3xl text-ink">Todavía no hay canciones</p>
       </div>
     )
   }
@@ -59,7 +60,7 @@ export function SongList({ songs, onReorder }: SongListProps) {
       <SortableContext items={items} strategy={verticalListSortingStrategy}>
         <div className="flex flex-col">
           {songs.map((song) => (
-            <SongItem key={song.rank} song={song} />
+            <SongItem key={song.rank} song={song} onDoubleClick={onDoubleClickSong} />
           ))}
         </div>
       </SortableContext>
