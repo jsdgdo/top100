@@ -10,9 +10,20 @@ export async function searchSongs(term: string): Promise<Omit<Song, 'rank'>[]> {
       const res = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(query)}`)
       if (!res.ok) throw new Error('Spotify oEmbed failed')
       const data = await res.json()
+
+      let title = data.title || 'Unknown Title'
+      let artist = data.author_name || 'Spotify'
+
+      // Spotify titles in oEmbed are usually "Song Name by Artist Name"
+      if (title.includes(' by ')) {
+        const parts = title.split(' by ')
+        title = parts[0].trim()
+        artist = parts[1].trim()
+      }
+
       return [{
-        title: data.title || 'Unknown Title',
-        artist: data.provider_name || 'Spotify', // Spotify oembed doesn't reliably give artist, but title often includes it for some embeds, or provider_name is fallback.
+        title,
+        artist,
         album: 'Spotify Link',
         year: new Date().getFullYear(),
         cover: data.thumbnail_url || ''
@@ -25,7 +36,6 @@ export async function searchSongs(term: string): Promise<Omit<Song, 'rank'>[]> {
       if (!res.ok) throw new Error('YouTube oEmbed failed')
       const data = await res.json()
 
-      // YouTube titles usually format as "Artist - Song Title"
       let artist = data.author_name || 'YouTube'
       let title = data.title || 'Unknown Video'
 
@@ -44,27 +54,74 @@ export async function searchSongs(term: string): Promise<Omit<Song, 'rank'>[]> {
       }]
     }
 
-    // 3. Fallback to iTunes Search
-    const url = new URL('https://itunes.apple.com/search')
-    url.searchParams.set('term', query)
-    url.searchParams.set('media', 'music')
-    url.searchParams.set('entity', 'song')
-    url.searchParams.set('limit', '10')
+    // 3. iTunes Search: Try standard Fetch first, then fallback to JSONP
+    const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=20`
 
-    const response = await fetch(url.toString())
-    if (!response.ok) throw new Error('Network response was not ok')
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout for fetch
 
-    const data = await response.json()
+      const response = await fetch(itunesUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
 
-    return data.results.map((item: any): Omit<Song, 'rank'> => ({
-      title: item.trackName || item.collectionName || 'Unknown Title',
-      artist: item.artistName || 'Unknown Artist',
-      album: item.collectionName || 'Unknown Album',
-      year: item.releaseDate ? new Date(item.releaseDate).getFullYear() : new Date().getFullYear(),
-      cover: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '300x300bb') : '',
-    }))
+      if (response.ok) {
+        const data = await response.json();
+        if (data.results && data.results.length > 0) {
+          return data.results.map((item: any): Omit<Song, 'rank'> => ({
+            title: item.trackName || item.collectionName || 'Unknown Title',
+            artist: item.artistName || 'Unknown Artist',
+            album: item.collectionName || 'Unknown Album',
+            year: item.releaseDate ? new Date(item.releaseDate).getFullYear() : new Date().getFullYear(),
+            cover: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '300x300bb') : '',
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('iTunes Fetch failed, trying JSONP...', e);
+    }
+
+    // 4. JSONP Fallback (for Safari/Mobile CORS issues)
+    return new Promise((resolve) => {
+      const callbackName = 'itunesCallback_' + Date.now();
+      const script = document.createElement('script');
+
+      const cleanup = () => {
+        if ((window as any)[callbackName]) delete (window as any)[callbackName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+        clearTimeout(timeout);
+      };
+
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve([]);
+      }, 6000);
+
+      (window as any)[callbackName] = (data: any) => {
+        cleanup();
+        if (!data || !data.results) {
+          resolve([]);
+          return;
+        }
+
+        const results = data.results.map((item: any): Omit<Song, 'rank'> => ({
+          title: item.trackName || item.collectionName || 'Unknown Title',
+          artist: item.artistName || 'Unknown Artist',
+          album: item.collectionName || 'Unknown Album',
+          year: item.releaseDate ? new Date(item.releaseDate).getFullYear() : new Date().getFullYear(),
+          cover: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '300x300bb') : '',
+        }));
+        resolve(results);
+      };
+
+      script.src = `${itunesUrl}&callback=${callbackName}&_cb=${Math.random().toString(36).substring(7)}`;
+      script.onerror = () => {
+        cleanup();
+        resolve([]);
+      };
+      document.body.appendChild(script);
+    });
   } catch (error) {
-    console.error('Error fetching song data:', error)
+    console.error('Search general error:', error)
     return []
   }
 }

@@ -18,6 +18,8 @@ export function AdminDashboard({ onAddSong }: AdminDashboardProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Omit<Song, 'rank'>[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
 
   // Focus PIN input on mount
   useEffect(() => {
@@ -45,6 +47,14 @@ export function AdminDashboard({ onAddSong }: AdminDashboardProps) {
     try {
       const data = await searchSongs(query)
       setResults(data)
+      setHasSearched(true)
+      if (data.length === 0) {
+        setSearchError('No se encontró nada o hubo un problema de conexión. 🧐')
+      } else {
+        setSearchError(null)
+      }
+    } catch (err) {
+      setSearchError('Error al buscar. Probá de nuevo en un ratito.')
     } finally {
       setIsSearching(false)
     }
@@ -54,6 +64,7 @@ export function AdminDashboard({ onAddSong }: AdminDashboardProps) {
     onAddSong(song)
     setQuery('')
     setResults([])
+    setHasSearched(false)
   }
 
   if (!isAuthenticated) {
@@ -118,24 +129,31 @@ export function AdminDashboard({ onAddSong }: AdminDashboardProps) {
         </button>
       </form>
 
-      {results.length > 0 && (
+      {results.length > 0 ? (
         <div className="space-y-4 max-h-96 overflow-y-auto pr-3 custom-scrollbar">
           {results.map((song, i) => (
-            <div key={i} className="flex items-center gap-3 p-2 rounded-xl bg-brand-bg border-3 border-ink shadow-[4px_4px_0_var(--color-ink)] hover:-translate-y-0.5 transition-transform group">
+            <div
+              key={i}
+              onClick={() => handleAdd(song)}
+              className="flex items-center gap-3 p-2 rounded-xl bg-brand-bg border-3 border-ink shadow-[4px_4px_0_var(--color-ink)] hover:-translate-y-0.5 hover:bg-brand-surface active:translate-y-0 active:shadow-none transition-all cursor-pointer group px-4"
+            >
               <img src={song.cover || 'fallback.jpg'} alt="cover" className="w-12 h-12 rounded-md object-cover border-2 border-ink shadow-[2px_2px_0_var(--color-ink)] bg-brand-surface" />
               <div className="flex-grow min-w-0 py-1">
                 <h4 className="font-bold text-ink text-base md:text-xl leading-tight">{song.title}</h4>
                 <p className="text-ink/80 font-hand text-lg md:text-xl leading-snug">{song.artist} • {song.year}</p>
               </div>
-              <button
-                onClick={() => handleAdd(song)}
-                className="p-2 bg-brand-surface border-2 border-ink text-ink shadow-[2px_2px_0_var(--color-ink)] active:translate-y-1 active:shadow-none hover:bg-brand-accent hover:text-white rounded-full transition-all flex-shrink-0"
+              <div
+                className="p-2 text-ink/40 group-hover:text-brand-accent transition-colors"
                 title="Add to Top 100"
               >
                 <PlusCircle size={24} strokeWidth={2.5} />
-              </button>
+              </div>
             </div>
           ))}
+        </div>
+      ) : hasSearched && !isSearching && (
+        <div className="text-center py-8">
+          <p className="font-hand text-2xl text-ink/60">{searchError || 'No se encontraron resultados... 🧐'}</p>
         </div>
       )}
     </div>

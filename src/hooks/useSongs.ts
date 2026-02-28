@@ -1,83 +1,106 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { Song } from '../types'
 import { arrayMove } from '@dnd-kit/sortable'
+import { supabase } from '../lib/supabase'
 
 export function useSongs() {
   const [songs, setSongs] = useState<Song[]>([])
   const [loading, setLoading] = useState(true)
-  const isInitialMount = useRef(true)
 
+  // 1. Initial Load from Supabase
   useEffect(() => {
-    const savedSongs = localStorage.getItem('top100_songs')
-    if (savedSongs) {
-      setSongs(JSON.parse(savedSongs))
-      setLoading(false)
-    } else {
-      fetch('/songs.json')
-        .then((res) => res.json())
-        .then((data) => {
+    async function loadSongs() {
+      try {
+        const { data, error } = await supabase
+          .from('songs')
+          .select('*')
+          .order('rank', { ascending: true })
+
+        if (error) throw error
+
+        if (data && data.length > 0) {
           setSongs(data)
-          setLoading(false)
-          localStorage.setItem('top100_songs', JSON.stringify(data))
-        })
-        .catch((err) => {
-          console.error('Error fetching songs:', err)
-          setLoading(false)
-        })
+        } else {
+          setSongs([])
+        }
+      } catch (err) {
+        console.error('Error with Supabase load:', err)
+      } finally {
+        setLoading(false)
+      }
     }
+
+    loadSongs()
   }, [])
 
-  // Persist to localStorage whenever songs change
-  useEffect(() => {
-    if (songs.length > 0) {
-      localStorage.setItem('top100_songs', JSON.stringify(songs))
+  // 2. Helper to sync all ranks (used for reordering and deleting)
+  const syncRanksToSupabase = async (updatedSongs: Song[]) => {
+    const { error } = await supabase.from('songs').upsert(
+      updatedSongs.map((song) => {
+        const { id, created_at, ...s } = song as any
+        return s
+      }),
+      { onConflict: 'rank' }
+    )
+    if (error) console.error('Error syncing ranks:', error)
+  }
 
-      // Skip the initial sync to disk to prevent the refresh loop
-      if (isInitialMount.current) {
-        isInitialMount.current = false
-        return
-      }
-
-      // Sync to disk (only in dev/local environment)
-      fetch('/api/songs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(songs),
-      }).catch(err => console.error('Error syncing to disk:', err))
-    }
-  }, [songs])
-
-  const reorderSongs = useCallback((activeId: string, overId: string) => {
+  const reorderSongs = useCallback(async (activeId: string, overId: string) => {
     setSongs((currentSongs) => {
       const oldIndex = currentSongs.findIndex((s) => s.rank.toString() === activeId)
       const newIndex = currentSongs.findIndex((s) => s.rank.toString() === overId)
 
       const newOrder = arrayMove(currentSongs, oldIndex, newIndex)
-      // Update ranks based on new array order
-      return newOrder.map((song, idx) => ({
+      const reRanked = newOrder.map((song, idx) => ({
         ...song,
         rank: idx + 1,
       }))
+
+      // Async sync to Supabase
+      syncRanksToSupabase(reRanked)
+
+      return reRanked
     })
   }, [])
 
-  const addSong = useCallback((newSong: Omit<Song, 'rank'>) => {
-    setSongs((current) => {
-      const nextRank = current.length + 1
-      return [...current, { ...newSong, rank: nextRank }]
-    })
-  }, [])
+  const addSong = useCallback(async (newSong: Omit<Song, 'rank'>) => {
+    const nextRank = songs.length + 1
+    const songWithRank = { ...newSong, rank: nextRank }
 
-  const deleteSong = useCallback((rank: number) => {
+    const { data, error } = await supabase
+      .from('songs')
+      .insert([songWithRank])
+      .select()
+
+    if (!error && data) {
+      setSongs((current) => [...current, data[0]])
+    } else {
+      console.error('Error adding song to Supabase:', error)
+    }
+  }, [songs.length])
+
+  const deleteSong = useCallback(async (rank: number) => {
+    // Delete from Supabase
+    const { error: deleteError } = await supabase
+      .from('songs')
+      .delete()
+      .eq('rank', rank)
+
+    if (deleteError) {
+      console.error('Error deleting from Supabase:', deleteError)
+      return
+    }
+
+    // Re-rank remaining in state and Supabase
     setSongs((current) => {
       const filtered = current.filter((s) => s.rank !== rank)
-      // Re-rank remaining songs
-      return filtered.map((song, idx) => ({
+      const reRanked = filtered.map((song, idx) => ({
         ...song,
         rank: idx + 1,
       }))
+
+      syncRanksToSupabase(reRanked)
+      return reRanked
     })
   }, [])
 

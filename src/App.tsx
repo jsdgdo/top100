@@ -63,7 +63,7 @@ function App() {
 
         {loading ? (
           <div className="text-center text-ink font-hand text-3xl mt-20 animate-pulse">
-            Brewing songs...
+            Cargando canciones...
           </div>
         ) : (
           <SongList
