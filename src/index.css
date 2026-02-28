@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Unbounded:wght@400..900&family=Geist:wght@300..700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-brand-bg: #e6d3af;
+  --color-brand-surface: #fffdf5;
+  --color-brand-accent: #216bb9;
+  --color-brand-accent-hover: #18508e;
+  --color-brand-secondary: #d96a60;
+  --color-ink: #181512;
+
+  --font-serif: "Unbounded", display;
+  /* Use 'display' or 'sans-serif' as fallback. */
+  --font-sans: "Geist", sans-serif;
+  --font-hand: "Caveat", cursive;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-brand-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom Utilities for retro sketchy effects */
+@layer utilities {
+  .sketch-panel {
+    background: var(--color-brand-surface);
+    border: 3px solid var(--color-ink);
+    border-radius: 12px;
+    box-shadow: 6px 6px 0px var(--color-ink);
+  }
+
+  .text-glow {
+    /* Removed glow, keeping class for structure */
+  }
+}

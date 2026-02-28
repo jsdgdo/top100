@@ -1,0 +1,42 @@
+[
+  {
+    "rank": 1,
+    "title": "Saturn",
+    "artist": "SZA",
+    "album": "Saturn - Single",
+    "year": 2024,
+    "cover": "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/0f/90/a8/0f90a856-0447-d846-fa7b-b9c937e72310/196871881180.jpg/300x300bb.jpg"
+  },
+  {
+    "title": "99 Problems",
+    "artist": "JAY-Z",
+    "album": "The Hits Collection Volume One (Edited Version)",
+    "year": 2003,
+    "cover": "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/17/4a/a7/174aa7ea-0116-6240-1187-1efb51552833/00602527586502.rgb.jpg/300x300bb.jpg",
+    "rank": 2
+  },
+  {
+    "title": "Numb",
+    "artist": "LINKIN PARK",
+    "album": "Meteora (Deluxe Edition)",
+    "year": 2003,
+    "cover": "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/13/44/05/134405bd-9e27-a678-8953-b5f724201f95/093624948988.jpg/300x300bb.jpg",
+    "rank": 3
+  },
+  {
+    "rank": 4,
+    "title": "Levitating",
+    "artist": "Dua Lipa",
+    "album": "Future Nostalgia",
+    "year": 2020,
+    "cover": "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/6c/11/d6/6c11d681-aa3a-d59e-4c2e-f77e181026ab/190295092665.jpg/300x300bb.jpg"
+  },
+  {
+    "rank": 5,
+    "title": "The Fate of Ophelia",
+    "artist": "Taylor Swift",
+    "album": "The Life of a Showgirl",
+    "year": 2025,
+    "cover": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/2d/46/e0/2d46e0bc-8ab9-85dd-4b56-ee6951351034/25UM1IM19577.rgb.jpg/300x300bb.jpg"
+  }
+]
